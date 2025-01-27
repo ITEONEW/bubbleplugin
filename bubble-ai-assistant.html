@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.js"></script>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="text/babel">
+        function App() {
+            const [file, setFile] = React.useState(null);
+            const [query, setQuery] = React.useState('');
+            const [result, setResult] = React.useState('');
+            const [diagram, setDiagram] = React.useState('');
+            const [loading, setLoading] = React.useState(false);
+
+            const handleFileChange = (event) => {
+                const file = event.target.files[0];
+                setFile(file);
+            };
+
+            const handleAnalyze = async () => {
+                if (!file || !query) return;
+                setLoading(true);
+                
+                try {
+                    const text = await file.text();
+                    const data = JSON.parse(text);
+                    
+                    // Generate relationship tree
+                    let analysis = "Database Structure:\n";
+                    Object.entries(data.DatabaseObjects).forEach(([table, schema]) => {
+                        analysis += `\n${table}\n`;
+                        if (schema.Relations) {
+                            Object.entries(schema.Relations).forEach(([rel, details]) => {
+                                analysis += `  → ${rel} (${details.type}) points to ${details.target}\n`;
+                            });
+                        }
+                    });
+                    
+                    setResult(analysis);
+                    generateDiagram(data);
+                } catch (error) {
+                    setResult(`Error: ${error.message}`);
+                }
+                
+                setLoading(false);
+            };
+
+            const generateDiagram = (data) => {
+                let uml = `digraph G {\n`;
+                Object.entries(data.DatabaseObjects).forEach(([table, schema]) => {
+                    if (schema.Relations) {
+                        Object.entries(schema.Relations).forEach(([rel, details]) => {
+                            uml += `  "${table}" -> "${details.target}" [label="${rel}"]\n`;
+                        });
+                    }
+                });
+                uml += `}`;
+                
+                // Convert to PlantUML URL
+                const encoded = btoa(uml);
+                setDiagram(`http://www.plantuml.com/plantuml/svg/${encoded}`);
+            };
+
+            return (
+                <div className="max-w-4xl mx-auto p-6">
+                    <div className="bg-white rounded-lg shadow-lg p-6">
+                        <h2 className="text-xl font-semibold mb-4">AI Development Assistant</h2>
+                        
+                        <input 
+                            type="file" 
+                            onChange={handleFileChange}
+                            accept=".json"
+                            className="mb-4 block w-full"
+                        />
+                        
+                        <textarea 
+                            value={query}
+                            onChange={(e) => setQuery(e.target.value)}
+                            className="w-full h-32 p-4 border rounded-lg mb-4"
+                            placeholder="Ask about your app structure..."
+                        />
+                        
+                        <button 
+                            onClick={handleAnalyze}
+                            disabled={loading}
+                            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700"
+                        >
+                            {loading ? 'Analyzing...' : 'Analyze'}
+                        </button>
+                        
+                        <div className="mt-6 grid grid-cols-2 gap-6">
+                            <div className="bg-gray-50 rounded-lg p-4">
+                                <h3 className="font-medium mb-2">Analysis Results</h3>
+                                <pre className="bg-white rounded p-4 whitespace-pre-wrap">
+                                    {result}
+                                </pre>
+                            </div>
+                            <div className="bg-gray-50 rounded-lg p-4">
+                                <h3 className="font-medium mb-2">Schema Diagram</h3>
+                                {diagram && (
+                                    <img src={diagram} alt="Schema diagram" className="w-full" />
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>
