@@ -1,19 +1,23 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="UTF-8">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body>
     <div id="root"></div>
     <script type="text/babel">
+        const { useState } = React;
+
         function App() {
-            const [file, setFile] = React.useState(null);
-            const [query, setQuery] = React.useState('');
-            const [result, setResult] = React.useState('');
-            const [diagram, setDiagram] = React.useState('');
-            const [loading, setLoading] = React.useState(false);
+            const [file, setFile] = useState(null);
+            const [query, setQuery] = useState('');
+            const [result, setResult] = useState('');
+            const [diagram, setDiagram] = useState('');
+            const [loading, setLoading] = useState(false);
 
             const handleFileChange = (event) => {
                 const file = event.target.files[0];
@@ -21,16 +25,18 @@
             };
 
             const handleAnalyze = async () => {
-                if (!file || !query) return;
+                if (!file || !query) {
+                    setResult('Please upload a JSON file and enter a query');
+                    return;
+                }
                 setLoading(true);
                 
                 try {
                     const text = await file.text();
                     const data = JSON.parse(text);
                     
-                    // Generate relationship tree
                     let analysis = "Database Structure:\n";
-                    Object.entries(data.DatabaseObjects).forEach(([table, schema]) => {
+                    Object.entries(data.DatabaseObjects || {}).forEach(([table, schema]) => {
                         analysis += `\n${table}\n`;
                         if (schema.Relations) {
                             Object.entries(schema.Relations).forEach(([rel, details]) => {
@@ -49,18 +55,17 @@
             };
 
             const generateDiagram = (data) => {
-                let uml = `digraph G {\n`;
-                Object.entries(data.DatabaseObjects).forEach(([table, schema]) => {
+                let uml = '@startuml\n';
+                Object.entries(data.DatabaseObjects || {}).forEach(([table, schema]) => {
                     if (schema.Relations) {
                         Object.entries(schema.Relations).forEach(([rel, details]) => {
-                            uml += `  "${table}" -> "${details.target}" [label="${rel}"]\n`;
+                            uml += `${table} --> ${details.target} : ${rel}\n`;
                         });
                     }
                 });
-                uml += `}`;
+                uml += '@enduml';
                 
-                // Convert to PlantUML URL
-                const encoded = btoa(uml);
+                const encoded = btoa(uml).replace(/\+/g, '-').replace(/\//g, '_');
                 setDiagram(`http://www.plantuml.com/plantuml/svg/${encoded}`);
             };
 
@@ -69,32 +74,34 @@
                     <div className="bg-white rounded-lg shadow-lg p-6">
                         <h2 className="text-xl font-semibold mb-4">AI Development Assistant</h2>
                         
-                        <input 
-                            type="file" 
-                            onChange={handleFileChange}
-                            accept=".json"
-                            className="mb-4 block w-full"
-                        />
+                        <div className="mb-4">
+                            <input 
+                                type="file" 
+                                onChange={handleFileChange}
+                                accept=".json"
+                                className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                            />
+                        </div>
                         
                         <textarea 
                             value={query}
                             onChange={(e) => setQuery(e.target.value)}
-                            className="w-full h-32 p-4 border rounded-lg mb-4"
+                            className="w-full h-32 p-4 border rounded-lg mb-4 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                             placeholder="Ask about your app structure..."
                         />
                         
                         <button 
                             onClick={handleAnalyze}
                             disabled={loading}
-                            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700"
+                            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50"
                         >
                             {loading ? 'Analyzing...' : 'Analyze'}
                         </button>
                         
-                        <div className="mt-6 grid grid-cols-2 gap-6">
+                        <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className="bg-gray-50 rounded-lg p-4">
                                 <h3 className="font-medium mb-2">Analysis Results</h3>
-                                <pre className="bg-white rounded p-4 whitespace-pre-wrap">
+                                <pre className="bg-white rounded p-4 whitespace-pre-wrap overflow-auto max-h-96">
                                     {result}
                                 </pre>
                             </div>
