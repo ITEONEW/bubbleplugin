@@ -6,11 +6,20 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
 </head>
 <body>
     <div id="root"></div>
     <script type="text/babel">
         const { useState } = React;
+
+        function compress(s) {
+            const data = new TextEncoder().encode(s);
+            const compressed = pako.deflate(data);
+            return btoa(String.fromCharCode.apply(null, compressed))
+                .replace(/\+/g, '-')
+                .replace(/\//g, '_');
+        }
 
         function App() {
             const [file, setFile] = useState(null);
@@ -55,17 +64,24 @@
             };
 
             const generateDiagram = (data) => {
-                let uml = '@startuml\n';
+                let uml = '@startuml\nskinparam monochrome true\n';
+                Object.entries(data.DatabaseObjects || {}).forEach(([table]) => {
+                    uml += `entity "${table}" {\n}\n`;
+                });
                 Object.entries(data.DatabaseObjects || {}).forEach(([table, schema]) => {
                     if (schema.Relations) {
                         Object.entries(schema.Relations).forEach(([rel, details]) => {
-                            uml += `${table} --> ${details.target} : ${rel}\n`;
+                            if (details.type === 'list') {
+                                uml += `"${table}" }|--|| "${details.target}" : ${rel}\n`;
+                            } else {
+                                uml += `"${table}" ||--|| "${details.target}" : ${rel}\n`;
+                            }
                         });
                     }
                 });
                 uml += '@enduml';
                 
-                const encoded = btoa(uml).replace(/\+/g, '-').replace(/\//g, '_');
+                const encoded = compress(uml);
                 setDiagram(`http://www.plantuml.com/plantuml/svg/${encoded}`);
             };
 
